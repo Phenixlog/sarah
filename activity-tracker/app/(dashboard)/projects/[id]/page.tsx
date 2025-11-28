@@ -8,7 +8,7 @@ import { ProjectProgress } from '@/components/projects/project-progress'
 import { ProjectMilestones } from '@/components/projects/project-milestones'
 import { ProjectDocuments } from '@/components/projects/project-documents'
 import { ProjectNotes } from '@/components/projects/project-notes'
-import { ProjectTodos } from '@/components/projects/project-todos'
+import { ProjectTasks } from '@/components/projects/project-tasks'
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -61,13 +61,23 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     .eq('project_id', project.id)
     .order('created_at', { ascending: false })
 
-  // Get todos linked to this project
-  const { data: todos } = await supabase
-    .from('todos')
-    .select('*')
+  // Get project tasks with assigned user info
+  const { data: tasks } = await supabase
+    .from('project_tasks')
+    .select(`
+      *,
+      assigned_user:assigned_to (id, full_name, email)
+    `)
     .eq('project_id', project.id)
     .order('priority', { ascending: true })
-    .order('due_date', { ascending: true })
+    .order('created_at', { ascending: false })
+
+  // Get project members (owner + team members)
+  const memberIds = [project.owner_id, ...(project.team_members || [])]
+  const { data: members } = await supabase
+    .from('profiles')
+    .select('id, full_name, email')
+    .in('id', memberIds)
 
   const isOwner = project.owner_id === user!.id
 
@@ -132,7 +142,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-text-secondary">Tâches liées</span>
                   <span className="text-lg font-semibold text-text-primary">
-                    {todos?.length || 0}
+                    {tasks?.length || 0}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
@@ -159,7 +169,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         </TabsContent>
 
         <TabsContent value="todos" className="mt-6">
-          <ProjectTodos projectId={project.id} todos={todos || []} />
+          <ProjectTasks
+            projectId={project.id}
+            tasks={tasks || []}
+            members={members || []}
+            currentUserId={user!.id}
+          />
         </TabsContent>
 
         <TabsContent value="milestones" className="mt-6">

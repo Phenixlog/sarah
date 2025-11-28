@@ -219,6 +219,47 @@ export interface Database {
           updated_at?: string
         }
       }
+      project_tasks: {
+        Row: {
+          id: string
+          project_id: string
+          title: string
+          description: string | null
+          status: 'todo' | 'in_progress' | 'done'
+          priority: 'p1' | 'p2' | 'p3'
+          due_date: string | null
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          title: string
+          description?: string | null
+          status?: 'todo' | 'in_progress' | 'done'
+          priority?: 'p1' | 'p2' | 'p3'
+          due_date?: string | null
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          title?: string
+          description?: string | null
+          status?: 'todo' | 'in_progress' | 'done'
+          priority?: 'p1' | 'p2' | 'p3'
+          due_date?: string | null
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
   }
 }
@@ -229,3 +270,4 @@ export type Profile = Database['public']['Tables']['profiles']['Row']
 export type ProjectDocument = Database['public']['Tables']['project_documents']['Row']
 export type ProjectMilestone = Database['public']['Tables']['project_milestones']['Row']
 export type ProjectNote = Database['public']['Tables']['project_notes']['Row']
+export type ProjectTask = Database['public']['Tables']['project_tasks']['Row']
