@@ -5,47 +5,82 @@ import { DateNavigator } from '@/components/todos/date-navigator'
 import { Card, CardContent } from '@/components/ui/card'
 import { CheckCircle2, Target } from 'lucide-react'
 
-interface TodosPageProps {
-  searchParams: { date?: string }
-}
-
-export default async function TodosPage({ searchParams }: TodosPageProps) {
+export default async function TodosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string }>
+}) {
+  const params = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   const today = new Date().toISOString().split('T')[0]
-  const selectedDate = searchParams.date || today
+  const selectedDate = params.date || today
   const isToday = selectedDate === today
 
   // Optimize queries by running in parallel
   const startOfDay = new Date(selectedDate + 'T00:00:00').toISOString()
   const endOfDay = new Date(selectedDate + 'T23:59:59').toISOString()
 
-  const [
-    { data: focusTodos },
-    { data: completedOnDate }
-  ] = await Promise.all([
-    supabase
-      .from('todos')
-      .select('*')
-      .eq('user_id', user!.id)
-      .lte('due_date', selectedDate)
-      .neq('status', 'done')
-      .order('priority', { ascending: true })
-      .order('due_date', { ascending: true }),
+  let focusTodos = []
+  let completedOnDate = []
+  let error = null
 
-    supabase
-      .from('todos')
-      .select('*')
-      .eq('user_id', user!.id)
-      .eq('status', 'done')
-      .gte('completed_at', startOfDay)
-      .lte('completed_at', endOfDay)
-      .order('completed_at', { ascending: false })
-  ])
+  try {
+    const [
+      { data: focusData, error: focusError },
+      { data: completedData, error: completedError }
+    ] = await Promise.all([
+      supabase
+        .from('todos')
+        .select('*')
+        .eq('user_id', user!.id)
+        .lte('due_date', selectedDate)
+        .neq('status', 'done')
+        .order('priority', { ascending: true })
+        .order('due_date', { ascending: true }),
 
-  const totalFocus = focusTodos?.length || 0
-  const completedCount = completedOnDate?.length || 0
+      supabase
+        .from('todos')
+        .select('*')
+        .eq('user_id', user!.id)
+        .eq('status', 'done')
+        .gte('completed_at', startOfDay)
+        .lte('completed_at', endOfDay)
+        .order('completed_at', { ascending: false })
+    ])
+
+    if (focusError) {
+      console.error('Focus Error:', focusError)
+      throw focusError
+    }
+    if (completedError) {
+      console.error('Completed Error:', completedError)
+      throw completedError
+    }
+
+    focusTodos = focusData || []
+    completedOnDate = completedData || []
+
+  } catch (e) {
+    console.error('CRITICAL ERROR loading todos:', e)
+    error = e
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 text-center text-red-500">
+        <h2 className="text-xl font-bold mb-2">Erreur de chargement</h2>
+        <p>Une erreur est survenue lors du chargement de vos tâches.</p>
+        <pre className="mt-4 p-4 bg-gray-100 rounded text-left text-xs overflow-auto max-w-lg mx-auto">
+          {JSON.stringify(error, null, 2)}
+        </pre>
+      </div>
+    )
+  }
+
+  const totalFocus = focusTodos.length
+  const completedCount = completedOnDate.length
 
   return (
     <div className="space-y-6 animate-fade-in-up max-w-4xl mx-auto">
@@ -70,7 +105,7 @@ export default async function TodosPage({ searchParams }: TodosPageProps) {
 
       {/* Main Focus List */}
       <div className="space-y-4">
-        {focusTodos && focusTodos.length > 0 ? (
+        {focusTodos.length > 0 ? (
           <TodoList
             todos={focusTodos}
             emptyMessage="Aucune tâche"
@@ -97,7 +132,7 @@ export default async function TodosPage({ searchParams }: TodosPageProps) {
       </div>
 
       {/* Completed Section */}
-      {completedOnDate && completedOnDate.length > 0 && (
+      {completedOnDate.length > 0 && (
         <div className="pt-8 border-t border-border/50">
           <h3 className="text-lg font-semibold text-text-secondary mb-4 flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5" />
