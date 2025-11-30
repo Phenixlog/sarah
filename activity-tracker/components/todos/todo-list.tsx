@@ -12,26 +12,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { MoreHorizontal, Calendar, Trash2, Edit, ArrowRight } from 'lucide-react'
+import { MoreHorizontal, Calendar, Trash2, Edit, ArrowRight, CheckSquare } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { EditTodoDialog } from './edit-todo-dialog'
+import { cn } from '@/lib/utils'
 import type { Todo, Project } from '@/types/database'
 
 interface TodoListProps {
   todos: (Todo & { projects?: Project | null })[]
-  projects: Pick<Project, 'id' | 'name'>[]
   emptyMessage?: string
 }
 
-export function TodoList({ todos, projects, emptyMessage = 'Aucune tâche' }: TodoListProps) {
+export function TodoList({ todos, emptyMessage = 'Aucune tâche' }: TodoListProps) {
   const router = useRouter()
   const [editingTodo, setEditingTodo] = useState<(Todo & { projects?: Project | null }) | null>(null)
 
-  const priorityColors = {
-    p1: 'danger',
-    p2: 'warning',
-    p3: 'default',
+  const priorityConfig = {
+    p1: { variant: 'danger' as const, icon: '🔥', label: 'P1' },
+    p2: { variant: 'warning' as const, icon: '⚡', label: 'P2' },
+    p3: { variant: 'default' as const, icon: '📌', label: 'P3' },
   }
 
   const statusColors = {
@@ -80,9 +80,14 @@ export function TodoList({ todos, projects, emptyMessage = 'Aucune tâche' }: To
 
   if (todos.length === 0) {
     return (
-      <Card>
-        <CardContent className="p-8 text-center text-text-secondary">
-          {emptyMessage}
+      <Card className="border-dashed">
+        <CardContent className="p-12 text-center">
+          <div className="flex flex-col items-center gap-3 animate-fade-in-up">
+            <div className="w-16 h-16 rounded-full bg-surface-elevated flex items-center justify-center">
+              <CheckSquare className="w-8 h-8 text-text-tertiary" />
+            </div>
+            <p className="text-text-secondary text-lg">{emptyMessage}</p>
+          </div>
         </CardContent>
       </Card>
     )
@@ -94,9 +99,10 @@ export function TodoList({ todos, projects, emptyMessage = 'Aucune tâche' }: To
         {todos.map((todo) => (
           <Card
             key={todo.id}
-            className={`hover:border-border-light transition-colors ${
-              todo.status === 'done' ? 'opacity-60' : ''
-            }`}
+            className={cn(
+              'group transition-all duration-300 hover:scale-[1.01] animate-fade-in-up',
+              todo.status === 'done' && 'opacity-60'
+            )}
           >
             <CardContent className="p-4">
               <div className="flex items-start gap-4">
@@ -109,16 +115,20 @@ export function TodoList({ todos, projects, emptyMessage = 'Aucune tâche' }: To
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-4 mb-2">
                     <h3
-                      className={`font-medium text-text-primary ${
-                        todo.status === 'done' ? 'line-through' : ''
-                      }`}
+                      className={cn(
+                        'font-semibold text-text-primary',
+                        todo.status === 'done' && 'line-through'
+                      )}
                     >
                       {todo.title}
                     </h3>
 
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <Badge variant={priorityColors[todo.priority as keyof typeof priorityColors] as any}>
-                        {todo.priority.toUpperCase()}
+                      <Badge
+                        variant={priorityConfig[todo.priority as keyof typeof priorityConfig].variant}
+                        icon={priorityConfig[todo.priority as keyof typeof priorityConfig].icon}
+                      >
+                        {priorityConfig[todo.priority as keyof typeof priorityConfig].label}
                       </Badge>
                       {todo.status !== 'todo' && (
                         <Badge variant={statusColors[todo.status as keyof typeof statusColors] as any}>
@@ -171,7 +181,7 @@ export function TodoList({ todos, projects, emptyMessage = 'Aucune tâche' }: To
                       </span>
                     )}
                     {todo.projects && (
-                      <Badge variant="default" className="text-xs">
+                      <Badge variant="glass" className="text-xs">
                         {todo.projects.name}
                       </Badge>
                     )}
@@ -195,7 +205,6 @@ export function TodoList({ todos, projects, emptyMessage = 'Aucune tâche' }: To
       {editingTodo && (
         <EditTodoDialog
           todo={editingTodo}
-          projects={projects}
           open={!!editingTodo}
           onOpenChange={(open) => !open && setEditingTodo(null)}
         />

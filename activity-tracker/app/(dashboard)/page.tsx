@@ -3,43 +3,42 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { CheckSquare, FolderKanban, Calendar } from 'lucide-react'
 import Link from 'next/link'
-import { formatDate, isToday } from '@/lib/utils'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Get today's todos
   const today = new Date().toISOString().split('T')[0]
-  const { data: todayTodos } = await supabase
-    .from('todos')
-    .select('*')
-    .eq('user_id', user!.id)
-    .eq('due_date', today)
-    .order('priority', { ascending: true })
 
-  // Get active projects
-  const { data: activeProjects } = await supabase
-    .from('projects')
-    .select('*')
-    .or(`owner_id.eq.${user!.id},team_members.cs.{${user!.id}}`)
-    .neq('status', 'completed')
-    .order('updated_at', { ascending: false })
-    .limit(5)
+  // Run all queries in parallel for better performance
+  const [
+    { data: todayTodos },
+    { count: totalTodos },
+    { data: activeProjects }
+  ] = await Promise.all([
+    supabase
+      .from('todos')
+      .select('*')
+      .eq('user_id', user!.id)
+      .eq('due_date', today)
+      .neq('status', 'done')
+      .order('priority', { ascending: true })
+      .limit(5),
 
-  // Get stats
-  const { count: totalTodos } = await supabase
-    .from('todos')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user!.id)
-    .neq('status', 'done')
+    supabase
+      .from('todos')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user!.id)
+      .neq('status', 'done'),
 
-  const { count: doneTodosToday } = await supabase
-    .from('todos')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user!.id)
-    .eq('status', 'done')
-    .gte('completed_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+    supabase
+      .from('projects')
+      .select('*')
+      .or(`owner_id.eq.${user!.id},team_members.cs.{${user!.id}}`)
+      .neq('status', 'completed')
+      .order('updated_at', { ascending: false })
+      .limit(3)
+  ])
 
   const priorityColors = {
     p1: 'danger',
@@ -64,59 +63,68 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-fade-in-up">
       <div>
-        <h1 className="text-3xl font-bold text-text-primary mb-2">Dashboard</h1>
-        <p className="text-text-secondary">Vue d'ensemble de votre activité</p>
+        <h1 className="text-4xl font-bold text-white mb-2">Dashboard</h1>
+        <p className="text-text-secondary text-base">Vue d'ensemble de votre activité</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
+        <Card className="hover:border-primary/30 transition-colors">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-text-secondary">
                 Tâches du jour
               </CardTitle>
-              <Calendar className="w-4 h-4 text-text-tertiary" />
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Calendar className="w-4 h-4 text-primary" />
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-text-primary">
+            <div className="text-4xl font-bold text-text-primary">
               {todayTodos?.length || 0}
             </div>
+            <p className="text-xs text-text-tertiary mt-1">Tâches à faire aujourd'hui</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="hover:border-accent-cyan/30 transition-colors">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-text-secondary">
                 Tâches actives
               </CardTitle>
-              <CheckSquare className="w-4 h-4 text-text-tertiary" />
+              <div className="w-8 h-8 rounded-lg bg-accent-cyan/10 flex items-center justify-center">
+                <CheckSquare className="w-4 h-4 text-accent-cyan" />
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-text-primary">
+            <div className="text-4xl font-bold text-text-primary">
               {totalTodos || 0}
             </div>
+            <p className="text-xs text-text-tertiary mt-1">Total des tâches en cours</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="hover:border-accent-pink/30 transition-colors">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-text-secondary">
                 Projets actifs
               </CardTitle>
-              <FolderKanban className="w-4 h-4 text-text-tertiary" />
+              <div className="w-8 h-8 rounded-lg bg-accent-pink/10 flex items-center justify-center">
+                <FolderKanban className="w-4 h-4 text-accent-pink" />
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-text-primary">
+            <div className="text-4xl font-bold text-text-primary">
               {activeProjects?.length || 0}
             </div>
+            <p className="text-xs text-text-tertiary mt-1">Projets en cours</p>
           </CardContent>
         </Card>
       </div>

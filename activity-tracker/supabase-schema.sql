@@ -270,3 +270,123 @@ USING (
   bucket_id = 'project-documents' AND
   auth.uid()::text = (storage.foldername(name))[1]
 );
+
+-- Create project_members table
+CREATE TABLE IF NOT EXISTS public.project_members (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'member', 'viewer')),
+  joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(project_id, user_id)
+);
+
+-- Create project_tasks table
+CREATE TABLE IF NOT EXISTS public.project_tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  status TEXT NOT NULL DEFAULT 'todo' CHECK (status IN ('todo', 'in_progress', 'done')),
+  assignee_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  due_date DATE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Add origin_project_task_id to todos
+ALTER TABLE public.todos
+ADD COLUMN IF NOT EXISTS origin_project_task_id UUID REFERENCES public.project_tasks(id) ON DELETE SET NULL;
+
+-- Create indexes for new tables
+CREATE INDEX IF NOT EXISTS idx_project_members_project_id ON public.project_members(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_members_user_id ON public.project_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_project_tasks_project_id ON public.project_tasks(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_tasks_assignee_id ON public.project_tasks(assignee_id);
+
+-- Enable RLS
+ALTER TABLE public.project_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.project_tasks ENABLE ROW LEVEL SECURITY;
+
+-- Project Members Policies
+CREATE POLICY "Users can view members of their projects" ON public.project_members
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.projects
+      WHERE id = project_members.project_id
+      AND (owner_id = auth.uid() OR auth.uid() = ANY(team_members)) 
+      -- Note: We will transition away from team_members array to this table, 
+      -- but for now keeping compatibility or we should update the project policy to use this table.
+      -- Let's update the project policy logic to use this table in a future step or now.
+      -- For now, let's assume 'team_members' array is still the source of truth until we migrate data, 
+      -- OR we can check existence in this table itself for other queries.
+    )
+    OR user_id = auth.uid()
+  );
+
+-- Allow project owners to manage members
+CREATE POLICY "Project owners can manage members" ON public.project_members
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.projects
+      WHERE id = project_members.project_id
+      AND owner_id = auth.uid()
+    )
+  );
+
+-- Project Tasks Policies
+CREATE POLICY "Users can view tasks of their projects" ON public.project_tasks
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.projects
+      WHERE id = project_tasks.project_id
+      AND (
+        owner_id = auth.uid() 
+        OR auth.uid() = ANY(team_members)
+        OR EXISTS (SELECT 1 FROM public.project_members WHERE project_id = project_tasks.project_id AND user_id = auth.uid())
+      )
+    )
+  );
+
+CREATE POLICY "Users can create tasks in their projects" ON public.project_tasks
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.projects
+      WHERE id = project_id
+      AND (
+        owner_id = auth.uid() 
+        OR auth.uid() = ANY(team_members)
+        OR EXISTS (SELECT 1 FROM public.project_members WHERE project_id = project_tasks.project_id AND user_id = auth.uid())
+      )
+    )
+  );
+
+CREATE POLICY "Users can update tasks in their projects" ON public.project_tasks
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM public.projects
+      WHERE id = project_id
+      AND (
+        owner_id = auth.uid() 
+        OR auth.uid() = ANY(team_members)
+        OR EXISTS (SELECT 1 FROM public.project_members WHERE project_id = project_tasks.project_id AND user_id = auth.uid())
+      )
+    )
+  );
+
+CREATE POLICY "Users can delete tasks in their projects" ON public.project_tasks
+  FOR DELETE USING (
+    EXISTS (
+      SELECT 1 FROM public.projects
+      WHERE id = project_id
+      AND (
+        owner_id = auth.uid() 
+        OR auth.uid() = ANY(team_members)
+        OR EXISTS (SELECT 1 FROM public.project_members WHERE project_id = project_tasks.project_id AND user_id = auth.uid())
+      )
+    )
+  );
+
+-- Trigger for updated_at on project_tasks
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON public.project_tasks
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();

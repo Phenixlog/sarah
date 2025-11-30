@@ -1,103 +1,113 @@
 import { createClient } from '@/lib/supabase/server'
 import { TodoList } from '@/components/todos/todo-list'
 import { CreateTodoDialog } from '@/components/todos/create-todo-dialog'
-import { Card } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { DateNavigator } from '@/components/todos/date-navigator'
+import { Card, CardContent } from '@/components/ui/card'
+import { CheckCircle2, Target } from 'lucide-react'
 
-export default async function TodosPage() {
+interface TodosPageProps {
+  searchParams: { date?: string }
+}
+
+export default async function TodosPage({ searchParams }: TodosPageProps) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Get today's date
   const today = new Date().toISOString().split('T')[0]
+  const selectedDate = searchParams.date || today
+  const isToday = selectedDate === today
 
-  // Get todos for today
-  const { data: todayTodos } = await supabase
-    .from('todos')
-    .select('*, projects(id, name)')
-    .eq('user_id', user!.id)
-    .eq('due_date', today)
-    .order('priority', { ascending: true })
-    .order('created_at', { ascending: false })
+  // Optimize queries by running in parallel
+  const startOfDay = new Date(selectedDate + 'T00:00:00').toISOString()
+  const endOfDay = new Date(selectedDate + 'T23:59:59').toISOString()
 
-  // Get tomorrow's todos
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  const tomorrowDate = tomorrow.toISOString().split('T')[0]
+  const [
+    { data: focusTodos },
+    { data: completedOnDate }
+  ] = await Promise.all([
+    supabase
+      .from('todos')
+      .select('*')
+      .eq('user_id', user!.id)
+      .lte('due_date', selectedDate)
+      .neq('status', 'done')
+      .order('priority', { ascending: true })
+      .order('due_date', { ascending: true }),
 
-  const { data: tomorrowTodos } = await supabase
-    .from('todos')
-    .select('*, projects(id, name)')
-    .eq('user_id', user!.id)
-    .eq('due_date', tomorrowDate)
-    .order('priority', { ascending: true })
-    .order('created_at', { ascending: false })
+    supabase
+      .from('todos')
+      .select('*')
+      .eq('user_id', user!.id)
+      .eq('status', 'done')
+      .gte('completed_at', startOfDay)
+      .lte('completed_at', endOfDay)
+      .order('completed_at', { ascending: false })
+  ])
 
-  // Get backlog (no due date)
-  const { data: backlogTodos } = await supabase
-    .from('todos')
-    .select('*, projects(id, name)')
-    .eq('user_id', user!.id)
-    .is('due_date', null)
-    .order('priority', { ascending: true })
-    .order('created_at', { ascending: false })
-
-  // Get overdue todos
-  const { data: overdueTodos } = await supabase
-    .from('todos')
-    .select('*, projects(id, name)')
-    .eq('user_id', user!.id)
-    .lt('due_date', today)
-    .neq('status', 'done')
-    .order('due_date', { ascending: true })
-
-  // Get all projects for the create dialog
-  const { data: projects } = await supabase
-    .from('projects')
-    .select('id, name')
-    .or(`owner_id.eq.${user!.id},team_members.cs.{${user!.id}}`)
-    .order('name', { ascending: true })
+  const totalFocus = focusTodos?.length || 0
+  const completedCount = completedOnDate?.length || 0
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 animate-fade-in-up max-w-4xl mx-auto">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-text-primary mb-2">To-Do</h1>
-          <p className="text-text-secondary">Gérez vos tâches quotidiennes</p>
+          <h1 className="text-4xl font-bold text-white flex items-center gap-3">
+            <Target className="w-8 h-8 text-primary" />
+            {isToday ? 'Focus du Jour' : 'Historique'}
+          </h1>
+          <p className="text-text-secondary mt-2 text-base">
+            {totalFocus > 0
+              ? `${totalFocus} tâche${totalFocus > 1 ? 's' : ''} ${isToday ? 'à traiter' : 'ce jour-là'}`
+              : isToday ? "Tout est à jour" : "Aucune tâche ce jour-là"}
+          </p>
         </div>
-        <CreateTodoDialog projects={projects || []} />
+        {isToday && <CreateTodoDialog />}
       </div>
 
-      {overdueTodos && overdueTodos.length > 0 && (
-        <Card className="border-danger/20 bg-danger/5">
-          <div className="p-4">
-            <h3 className="font-semibold text-danger mb-3">
-              Tâches en retard ({overdueTodos.length})
-            </h3>
-            <TodoList todos={overdueTodos} projects={projects || []} />
+      {/* Date Navigator */}
+      <DateNavigator currentDate={selectedDate} />
+
+      {/* Main Focus List */}
+      <div className="space-y-4">
+        {focusTodos && focusTodos.length > 0 ? (
+          <TodoList
+            todos={focusTodos}
+            emptyMessage="Aucune tâche"
+          />
+        ) : (
+          <Card className="border-dashed border-primary/20 bg-primary/5">
+            <CardContent className="p-12 text-center flex flex-col items-center gap-4">
+              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+                <CheckCircle2 className="w-10 h-10 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-text-primary mb-2">
+                  {isToday ? 'Vous êtes à jour !' : 'Aucune tâche'}
+                </h3>
+                <p className="text-text-secondary">
+                  {isToday
+                    ? "Aucune tâche en retard ou prévue pour aujourd'hui."
+                    : "Aucune tâche pour cette date."}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Completed Section */}
+      {completedOnDate && completedOnDate.length > 0 && (
+        <div className="pt-8 border-t border-border/50">
+          <h3 className="text-lg font-semibold text-text-secondary mb-4 flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5" />
+            Terminé {isToday ? "aujourd'hui" : 'ce jour-là'} ({completedCount})
+          </h3>
+          <div className="opacity-75 hover:opacity-100 transition-opacity">
+            <TodoList todos={completedOnDate} />
           </div>
-        </Card>
+        </div>
       )}
-
-      <Tabs defaultValue="today" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-3 bg-surface-elevated">
-          <TabsTrigger value="today">Aujourd'hui</TabsTrigger>
-          <TabsTrigger value="tomorrow">Demain</TabsTrigger>
-          <TabsTrigger value="backlog">Backlog</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="today" className="mt-6">
-          <TodoList todos={todayTodos || []} projects={projects || []} emptyMessage="Aucune tâche pour aujourd'hui" />
-        </TabsContent>
-
-        <TabsContent value="tomorrow" className="mt-6">
-          <TodoList todos={tomorrowTodos || []} projects={projects || []} emptyMessage="Aucune tâche pour demain" />
-        </TabsContent>
-
-        <TabsContent value="backlog" className="mt-6">
-          <TodoList todos={backlogTodos || []} projects={projects || []} emptyMessage="Aucune tâche dans le backlog" />
-        </TabsContent>
-      </Tabs>
     </div>
   )
 }

@@ -17,13 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select } from '@/components/ui/select'
 import { Plus } from 'lucide-react'
-import type { Project } from '@/types/database'
-
-interface CreateTodoDialogProps {
-  projects: Pick<Project, 'id' | 'name'>[]
-}
-
-export function CreateTodoDialog({ projects }: CreateTodoDialogProps) {
+export function CreateTodoDialog() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -32,7 +26,6 @@ export function CreateTodoDialog({ projects }: CreateTodoDialogProps) {
     description: '',
     priority: 'p2',
     due_date: new Date().toISOString().split('T')[0],
-    project_id: '',
     tags: '',
   })
 
@@ -56,7 +49,6 @@ export function CreateTodoDialog({ projects }: CreateTodoDialogProps) {
       description: formData.description || null,
       priority: formData.priority as 'p1' | 'p2' | 'p3',
       due_date: formData.due_date || null,
-      project_id: formData.project_id || null,
       tags,
     })
 
@@ -66,7 +58,6 @@ export function CreateTodoDialog({ projects }: CreateTodoDialogProps) {
         description: '',
         priority: 'p2',
         due_date: new Date().toISOString().split('T')[0],
-        project_id: '',
         tags: '',
       })
       setOpen(false)
@@ -148,23 +139,7 @@ export function CreateTodoDialog({ projects }: CreateTodoDialogProps) {
             </div>
           </div>
 
-          <div>
-            <label htmlFor="project_id" className="block text-sm font-medium text-text-primary mb-2">
-              Projet
-            </label>
-            <Select
-              id="project_id"
-              value={formData.project_id}
-              onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}
-            >
-              <option value="">Aucun projet</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </Select>
-          </div>
+
 
           <div>
             <label htmlFor="tags" className="block text-sm font-medium text-text-primary mb-2">

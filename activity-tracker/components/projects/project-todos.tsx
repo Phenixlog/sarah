@@ -1,20 +1,25 @@
 'use client'
 
+import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import type { Todo } from '@/types/database'
+import type { ProjectTask, ProjectMember } from '@/types/database'
+import { CreateProjectTaskDialog } from './create-project-task-dialog'
+import { Copy, User as UserIcon } from 'lucide-react'
 
-export function ProjectTodos({ projectId, todos }: { projectId: string; todos: Todo[] }) {
+interface ProjectTodosProps {
+  projectId: string
+  tasks: (ProjectTask & { assignee: { full_name: string | null; email: string } | null })[]
+  members: (ProjectMember & { profile: { full_name: string | null; email: string } | null })[]
+}
+
+export function ProjectTodos({ projectId, tasks, members }: ProjectTodosProps) {
   const router = useRouter()
-
-  const priorityColors = {
-    p1: 'danger',
-    p2: 'warning',
-    p3: 'default',
-  }
+  const [loadingId, setLoadingId] = useState<string | null>(null)
 
   const statusColors = {
     todo: 'default',
@@ -28,83 +33,124 @@ export function ProjectTodos({ projectId, todos }: { projectId: string; todos: T
     done: 'Terminé',
   }
 
-  const handleToggle = async (todo: Todo) => {
+  const handleToggle = async (task: ProjectTask) => {
     const supabase = createClient()
-    const newStatus = todo.status === 'done' ? 'todo' : 'done'
-    const completed_at = newStatus === 'done' ? new Date().toISOString() : null
+    const newStatus = task.status === 'done' ? 'todo' : 'done'
 
     await supabase
-      .from('todos')
-      .update({ status: newStatus, completed_at })
-      .eq('id', todo.id)
+      .from('project_tasks')
+      .update({ status: newStatus })
+      .eq('id', task.id)
 
     router.refresh()
   }
 
-  const todoCount = todos.filter((t) => t.status !== 'done').length
-  const doneCount = todos.filter((t) => t.status === 'done').length
+  const handleAddToMyTodo = async (task: ProjectTask) => {
+    setLoadingId(task.id)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) return
+
+    const { error } = await supabase.from('todos').insert({
+      user_id: user.id,
+      title: task.title,
+      description: task.description,
+      status: 'todo',
+      priority: 'p2',
+      origin_project_task_id: task.id,
+    })
+
+    if (!error) {
+      // Optional: Show success message
+      alert('Tâche ajoutée à votre liste personnelle !')
+    } else {
+      alert('Erreur lors de l\'ajout de la tâche.')
+    }
+    setLoadingId(null)
+  }
+
+  const doneCount = tasks.filter((t) => t.status === 'done').length
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-lg font-semibold text-text-primary">
-          Tâches liées ({doneCount}/{todos.length} terminées)
-        </h3>
-        <p className="text-sm text-text-secondary">
-          Tâches associées à ce projet
-        </p>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-text-primary">
+            Tâches du projet ({doneCount}/{tasks.length} terminées)
+          </h3>
+          <p className="text-sm text-text-secondary">
+            Gérez les tâches et assignez-les aux membres
+          </p>
+        </div>
+        <CreateProjectTaskDialog projectId={projectId} members={members} />
       </div>
 
-      {todos.length > 0 ? (
+      {tasks.length > 0 ? (
         <div className="space-y-3">
-          {todos.map((todo) => (
+          {tasks.map((task) => (
             <Card
-              key={todo.id}
-              className={`hover:border-border-light transition-colors ${
-                todo.status === 'done' ? 'opacity-60' : ''
-              }`}
+              key={task.id}
+              className={`hover:border-border-light transition-colors ${task.status === 'done' ? 'opacity-60' : ''
+                }`}
             >
               <CardContent className="p-4">
                 <div className="flex items-start gap-4">
                   <Checkbox
-                    checked={todo.status === 'done'}
-                    onCheckedChange={() => handleToggle(todo)}
+                    checked={task.status === 'done'}
+                    onCheckedChange={() => handleToggle(task)}
                     className="mt-1"
                   />
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-4 mb-2">
                       <h3
-                        className={`font-medium text-text-primary ${
-                          todo.status === 'done' ? 'line-through' : ''
-                        }`}
+                        className={`font-medium text-text-primary ${task.status === 'done' ? 'line-through' : ''
+                          }`}
                       >
-                        {todo.title}
+                        {task.title}
                       </h3>
 
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <Badge variant={priorityColors[todo.priority as keyof typeof priorityColors] as any}>
-                          {todo.priority.toUpperCase()}
+                        <Badge variant={statusColors[task.status as keyof typeof statusColors] as any}>
+                          {statusLabels[task.status as keyof typeof statusLabels]}
                         </Badge>
-                        {todo.status !== 'todo' && (
-                          <Badge variant={statusColors[todo.status as keyof typeof statusColors] as any}>
-                            {statusLabels[todo.status as keyof typeof statusLabels]}
-                          </Badge>
-                        )}
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 gap-2 text-text-secondary hover:text-primary"
+                          onClick={() => handleAddToMyTodo(task)}
+                          disabled={loadingId === task.id}
+                        >
+                          <Copy className="w-4 h-4" />
+                          <span className="sr-only sm:not-sr-only sm:inline-block text-xs">
+                            Ajouter à mes tâches
+                          </span>
+                        </Button>
                       </div>
                     </div>
 
-                    {todo.description && (
+                    {task.description && (
                       <p className="text-sm text-text-secondary mb-2 line-clamp-2">
-                        {todo.description}
+                        {task.description}
                       </p>
                     )}
 
-                    {todo.due_date && (
-                      <div className="text-xs text-text-tertiary">
-                        Échéance: {new Date(todo.due_date).toLocaleDateString('fr-FR')}
-                      </div>
-                    )}
+                    <div className="flex items-center gap-4 text-xs text-text-tertiary">
+                      {task.due_date && (
+                        <div>
+                          Échéance: {new Date(task.due_date).toLocaleDateString('fr-FR')}
+                        </div>
+                      )}
+
+                      {task.assignee && (
+                        <div className="flex items-center gap-1 text-primary">
+                          <UserIcon className="w-3 h-3" />
+                          {task.assignee.full_name || task.assignee.email}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -114,7 +160,7 @@ export function ProjectTodos({ projectId, todos }: { projectId: string; todos: T
       ) : (
         <Card>
           <CardContent className="p-8 text-center text-text-secondary">
-            Aucune tâche liée à ce projet
+            Aucune tâche dans ce projet
           </CardContent>
         </Card>
       )}

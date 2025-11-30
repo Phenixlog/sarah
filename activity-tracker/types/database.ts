@@ -53,6 +53,7 @@ export interface Database {
           completed_at: string | null
           created_at: string
           updated_at: string
+          origin_project_task_id: string | null
         }
         Insert: {
           id?: string
@@ -68,6 +69,7 @@ export interface Database {
           completed_at?: string | null
           created_at?: string
           updated_at?: string
+          origin_project_task_id?: string | null
         }
         Update: {
           id?: string
@@ -83,6 +85,7 @@ export interface Database {
           completed_at?: string | null
           created_at?: string
           updated_at?: string
+          origin_project_task_id?: string | null
         }
       }
       projects: {
@@ -219,6 +222,64 @@ export interface Database {
           updated_at?: string
         }
       }
+      project_members: {
+        Row: {
+          id: string
+          project_id: string
+          user_id: string
+          role: 'owner' | 'member' | 'viewer'
+          joined_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          user_id: string
+          role?: 'owner' | 'member' | 'viewer'
+          joined_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          user_id?: string
+          role?: 'owner' | 'member' | 'viewer'
+          joined_at?: string
+        }
+      }
+      project_tasks: {
+        Row: {
+          id: string
+          project_id: string
+          title: string
+          description: string | null
+          status: 'todo' | 'in_progress' | 'done'
+          assignee_id: string | null
+          due_date: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          title: string
+          description?: string | null
+          status?: 'todo' | 'in_progress' | 'done'
+          assignee_id?: string | null
+          due_date?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          title?: string
+          description?: string | null
+          status?: 'todo' | 'in_progress' | 'done'
+          assignee_id?: string | null
+          due_date?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
   }
 }
@@ -229,3 +290,5 @@ export type Profile = Database['public']['Tables']['profiles']['Row']
 export type ProjectDocument = Database['public']['Tables']['project_documents']['Row']
 export type ProjectMilestone = Database['public']['Tables']['project_milestones']['Row']
 export type ProjectNote = Database['public']['Tables']['project_notes']['Row']
+export type ProjectMember = Database['public']['Tables']['project_members']['Row']
+export type ProjectTask = Database['public']['Tables']['project_tasks']['Row']

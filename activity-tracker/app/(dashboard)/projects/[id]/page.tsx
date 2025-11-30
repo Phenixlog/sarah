@@ -61,13 +61,25 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     .eq('project_id', project.id)
     .order('created_at', { ascending: false })
 
-  // Get todos linked to this project
-  const { data: todos } = await supabase
-    .from('todos')
-    .select('*')
+  // Get project tasks
+  const { data: tasks } = await supabase
+    .from('project_tasks')
+    .select(`
+      *,
+      assignee:assignee_id (full_name, email)
+    `)
     .eq('project_id', project.id)
-    .order('priority', { ascending: true })
-    .order('due_date', { ascending: true })
+    .order('status', { ascending: true })
+    .order('created_at', { ascending: false })
+
+  // Get project members
+  const { data: members } = await supabase
+    .from('project_members')
+    .select(`
+      *,
+      profile:user_id (full_name, email, avatar_url)
+    `)
+    .eq('project_id', project.id)
 
   const isOwner = project.owner_id === user!.id
 
@@ -80,7 +92,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="grid w-full max-w-2xl grid-cols-5 bg-surface-elevated">
           <TabsTrigger value="overview">Vue d'ensemble</TabsTrigger>
-          <TabsTrigger value="todos">Tâches</TabsTrigger>
+          <TabsTrigger value="tasks">Tâches</TabsTrigger>
+          <TabsTrigger value="team">Équipe</TabsTrigger>
           <TabsTrigger value="milestones">Jalons</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
           <TabsTrigger value="notes">Notes</TabsTrigger>
@@ -132,7 +145,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-text-secondary">Tâches liées</span>
                   <span className="text-lg font-semibold text-text-primary">
-                    {todos?.length || 0}
+                    {tasks?.length || 0}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
@@ -158,8 +171,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           </div>
         </TabsContent>
 
-        <TabsContent value="todos" className="mt-6">
-          <ProjectTodos projectId={project.id} todos={todos || []} />
+        <TabsContent value="tasks" className="mt-6">
+          <ProjectTodos projectId={project.id} tasks={tasks || []} members={members || []} />
+        </TabsContent>
+
+        <TabsContent value="team" className="mt-6">
+          <div className="text-text-secondary">Gestion de l'équipe (Coming Soon)</div>
         </TabsContent>
 
         <TabsContent value="milestones" className="mt-6">

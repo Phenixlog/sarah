@@ -19,12 +19,11 @@ import type { Todo, Project } from '@/types/database'
 
 interface EditTodoDialogProps {
   todo: Todo & { projects?: Project | null }
-  projects: Pick<Project, 'id' | 'name'>[]
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-export function EditTodoDialog({ todo, projects, open, onOpenChange }: EditTodoDialogProps) {
+export function EditTodoDialog({ todo, open, onOpenChange }: EditTodoDialogProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
@@ -33,7 +32,6 @@ export function EditTodoDialog({ todo, projects, open, onOpenChange }: EditTodoD
     priority: todo.priority,
     status: todo.status,
     due_date: todo.due_date || '',
-    project_id: todo.project_id || '',
     tags: todo.tags?.join(', ') || '',
   })
 
@@ -44,7 +42,6 @@ export function EditTodoDialog({ todo, projects, open, onOpenChange }: EditTodoD
       priority: todo.priority,
       status: todo.status,
       due_date: todo.due_date || '',
-      project_id: todo.project_id || '',
       tags: todo.tags?.join(', ') || '',
     })
   }, [todo])
@@ -68,7 +65,6 @@ export function EditTodoDialog({ todo, projects, open, onOpenChange }: EditTodoD
         priority: formData.priority as 'p1' | 'p2' | 'p3',
         status: formData.status as 'todo' | 'in_progress' | 'done',
         due_date: formData.due_date || null,
-        project_id: formData.project_id || null,
         tags,
         completed_at: formData.status === 'done' ? new Date().toISOString() : null,
       })
@@ -163,23 +159,7 @@ export function EditTodoDialog({ todo, projects, open, onOpenChange }: EditTodoD
             />
           </div>
 
-          <div>
-            <label htmlFor="project_id" className="block text-sm font-medium text-text-primary mb-2">
-              Projet
-            </label>
-            <Select
-              id="project_id"
-              value={formData.project_id}
-              onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}
-            >
-              <option value="">Aucun projet</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </Select>
-          </div>
+
 
           <div>
             <label htmlFor="tags" className="block text-sm font-medium text-text-primary mb-2">
