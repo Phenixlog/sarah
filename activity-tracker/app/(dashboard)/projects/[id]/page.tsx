@@ -5,10 +5,24 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ProjectHeader } from '@/components/projects/project-header'
 import { ProjectProgress } from '@/components/projects/project-progress'
-import { ProjectMilestones } from '@/components/projects/project-milestones'
-import { ProjectDocuments } from '@/components/projects/project-documents'
-import { ProjectNotes } from '@/components/projects/project-notes'
-import { ProjectTasks } from '@/components/projects/project-tasks'
+import dynamic from 'next/dynamic'
+
+// Lazy load heavy tab components - they're only rendered when tabs are clicked
+const ProjectMilestones = dynamic(() => import('@/components/projects/project-milestones').then(mod => ({ default: mod.ProjectMilestones })), {
+  loading: () => <div className="animate-pulse bg-surface h-32 rounded" />
+})
+const ProjectDocuments = dynamic(() => import('@/components/projects/project-documents').then(mod => ({ default: mod.ProjectDocuments })), {
+  loading: () => <div className="animate-pulse bg-surface h-32 rounded" />
+})
+const ProjectNotes = dynamic(() => import('@/components/projects/project-notes').then(mod => ({ default: mod.ProjectNotes })), {
+  loading: () => <div className="animate-pulse bg-surface h-32 rounded" />
+})
+const ProjectTasks = dynamic(() => import('@/components/projects/project-tasks').then(mod => ({ default: mod.ProjectTasks })), {
+  loading: () => <div className="animate-pulse bg-surface h-32 rounded" />
+})
+
+// Cache this page and revalidate every 30 seconds
+export const revalidate = 30
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -34,50 +48,61 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     notFound()
   }
 
-  // Get milestones
-  const { data: milestones } = await supabase
-    .from('project_milestones')
-    .select('*')
-    .eq('project_id', project.id)
-    .order('due_date', { ascending: true })
-
-  // Get documents
-  const { data: documents } = await supabase
-    .from('project_documents')
-    .select(`
-      *,
-      profiles:uploaded_by (full_name)
-    `)
-    .eq('project_id', project.id)
-    .order('created_at', { ascending: false })
-
-  // Get notes
-  const { data: notes } = await supabase
-    .from('project_notes')
-    .select(`
-      *,
-      profiles:author_id (full_name)
-    `)
-    .eq('project_id', project.id)
-    .order('created_at', { ascending: false })
-
-  // Get project tasks with assigned user info
-  const { data: tasks } = await supabase
-    .from('project_tasks')
-    .select(`
-      *,
-      assigned_user:assigned_to (id, full_name, email)
-    `)
-    .eq('project_id', project.id)
-    .order('priority', { ascending: true })
-    .order('created_at', { ascending: false })
-
-  // Get project members (owner + team members)
+  // Get project members IDs
   const memberIds = [project.owner_id, ...(project.team_members || [])]
-  const { data: members } = await supabase
-    .from('profiles')
-    .select('id, full_name, email')
-    .in('id', memberIds)
+
+  // Parallelize all database queries for faster loading
+  const [
+    { data: milestones },
+    { data: documents },
+    { data: notes },
+    { data: tasks },
+    { data: members }
+  ] = await Promise.all([
+    // Get milestones
+    supabase
+      .from('project_milestones')
+      .select('*')
+      .eq('project_id', project.id)
+      .order('due_date', { ascending: true }),
+
+    // Get documents
+    supabase
+      .from('project_documents')
+      .select(`
+        *,
+        profiles:uploaded_by (full_name)
+      `)
+      .eq('project_id', project.id)
+      .order('created_at', { ascending: false }),
+
+    // Get notes
+    supabase
+      .from('project_notes')
+      .select(`
+        *,
+        profiles:author_id (full_name)
+      `)
+      .eq('project_id', project.id)
+      .order('created_at', { ascending: false }),
+
+    // Get project tasks with assigned user info
+    supabase
+      .from('project_tasks')
+      .select(`
+        *,
+        assigned_user:assigned_to (id, full_name, email)
+      `)
+      .eq('project_id', project.id)
+      .order('priority', { ascending: true })
+      .order('created_at', { ascending: false }),
+
+    // Get project members (owner + team members)
+    supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .in('id', memberIds)
+  ])
 
   const isOwner = project.owner_id === user!.id
 

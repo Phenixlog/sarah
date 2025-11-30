@@ -1,9 +1,18 @@
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { CreateProjectDialog } from '@/components/projects/create-project-dialog'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
+import dynamic from 'next/dynamic'
+
+// Lazy load heavy dialog component for better initial page load
+const CreateProjectDialog = dynamic(() => import('@/components/projects/create-project-dialog').then(mod => ({ default: mod.CreateProjectDialog })), {
+  ssr: false,
+  loading: () => <div className="h-10 w-10 animate-pulse bg-surface rounded" />
+})
+
+// Cache this page and revalidate every 60 seconds
+export const revalidate = 60
 
 export default async function ProjectsPage() {
   const supabase = await createClient()

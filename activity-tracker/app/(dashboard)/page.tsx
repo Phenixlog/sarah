@@ -5,41 +5,55 @@ import { CheckSquare, FolderKanban, Calendar } from 'lucide-react'
 import Link from 'next/link'
 import { formatDate, isToday } from '@/lib/utils'
 
+// Cache this page and revalidate every 30 seconds
+export const revalidate = 30
+
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Get today's todos
+  // Get today's date
   const today = new Date().toISOString().split('T')[0]
-  const { data: todayTodos } = await supabase
-    .from('todos')
-    .select('*')
-    .eq('user_id', user!.id)
-    .eq('due_date', today)
-    .order('priority', { ascending: true })
 
-  // Get active projects
-  const { data: activeProjects } = await supabase
-    .from('projects')
-    .select('*')
-    .or(`owner_id.eq.${user!.id},team_members.cs.{${user!.id}}`)
-    .neq('status', 'completed')
-    .order('updated_at', { ascending: false })
-    .limit(5)
+  // Parallelize all database queries for faster loading
+  const [
+    { data: todayTodos },
+    { data: activeProjects },
+    { count: totalTodos },
+    { count: doneTodosToday }
+  ] = await Promise.all([
+    // Get today's todos
+    supabase
+      .from('todos')
+      .select('*')
+      .eq('user_id', user!.id)
+      .eq('due_date', today)
+      .order('priority', { ascending: true }),
 
-  // Get stats
-  const { count: totalTodos } = await supabase
-    .from('todos')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user!.id)
-    .neq('status', 'done')
+    // Get active projects
+    supabase
+      .from('projects')
+      .select('*')
+      .or(`owner_id.eq.${user!.id},team_members.cs.{${user!.id}}`)
+      .neq('status', 'completed')
+      .order('updated_at', { ascending: false })
+      .limit(5),
 
-  const { count: doneTodosToday } = await supabase
-    .from('todos')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user!.id)
-    .eq('status', 'done')
-    .gte('completed_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+    // Get stats - total todos
+    supabase
+      .from('todos')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user!.id)
+      .neq('status', 'done'),
+
+    // Get stats - done todos today
+    supabase
+      .from('todos')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user!.id)
+      .eq('status', 'done')
+      .gte('completed_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+  ])
 
   const priorityColors = {
     p1: 'danger',
