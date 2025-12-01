@@ -1,0 +1,6 @@
+NEXT_PUBLIC_SUPABASE_URL=https://... (voir .env.local)
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ... (voir .env.local)
+
+# Copiez ces valeurs depuis votre fichier .env.local
+# et ajoutez-les dans les réglages de votre projet Vercel :
+# Settings > Environment Variables
