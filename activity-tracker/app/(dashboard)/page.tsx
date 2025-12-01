@@ -7,7 +7,18 @@ import { getDaysOld, getAgeConfig } from '@/lib/utils/date-helpers'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    // Redirect to login if not authenticated
+    // In a real app, middleware should handle this, but this is a safety net
+    // returning null or redirecting prevents the crash
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Veuillez vous connecter...</p>
+      </div>
+    )
+  }
 
   const today = new Date().toISOString().split('T')[0]
 

@@ -1,4 +1,5 @@
-export function getDaysOld(createdAt: string): number {
+export function getDaysOld(createdAt: string | null | undefined): number {
+    if (!createdAt) return 0
     const created = new Date(createdAt)
     const now = new Date()
     const diffTime = Math.abs(now.getTime() - created.getTime())
