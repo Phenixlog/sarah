@@ -14,16 +14,16 @@ export function WeekNavigator({ currentWeek }: WeekNavigatorProps) {
 
     const goToPreviousWeek = () => {
         const prevWeek = getPreviousWeek(currentWeek)
-        router.push(`/recap?week=${prevWeek}`)
+        router.push(`/todos?view=recap&week=${prevWeek}`)
     }
 
     const goToNextWeek = () => {
         const nextWeek = getNextWeek(currentWeek)
-        router.push(`/recap?week=${nextWeek}`)
+        router.push(`/todos?view=recap&week=${nextWeek}`)
     }
 
     const goToCurrentWeek = () => {
-        router.push('/recap')
+        router.push('/todos?view=recap')
     }
 
     return (
