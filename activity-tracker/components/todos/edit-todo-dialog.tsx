@@ -82,9 +82,9 @@ export function EditTodoDialog({ todo, open, onOpenChange }: EditTodoDialogProps
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Modifier la tâche</DialogTitle>
+          <DialogTitle>Détails de la tâche</DialogTitle>
           <DialogDescription>
-            Modifiez les détails de votre tâche
+            Consultez et modifiez les informations de votre tâche
           </DialogDescription>
         </DialogHeader>
 

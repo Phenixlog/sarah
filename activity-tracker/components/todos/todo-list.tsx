@@ -100,17 +100,21 @@ export function TodoList({ todos, emptyMessage = 'Aucune tâche' }: TodoListProp
           <Card
             key={todo.id}
             className={cn(
-              'group transition-all duration-300 hover:scale-[1.01] animate-fade-in-up',
+              'group transition-all duration-300 hover:scale-[1.01] cursor-pointer animate-fade-in-up',
               todo.status === 'done' && 'opacity-60'
             )}
+            onClick={() => setEditingTodo(todo)}
           >
             <CardContent className="p-4">
               <div className="flex items-start gap-4">
-                <Checkbox
-                  checked={todo.status === 'done'}
-                  onCheckedChange={() => handleToggle(todo)}
-                  className="mt-1"
-                />
+                {/* Checkbox - prevent card click */}
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    checked={todo.status === 'done'}
+                    onCheckedChange={() => handleToggle(todo)}
+                    className="mt-1"
+                  />
+                </div>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-4 mb-2">
@@ -136,31 +140,34 @@ export function TodoList({ todos, emptyMessage = 'Aucune tâche' }: TodoListProp
                         </Badge>
                       )}
 
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setEditingTodo(todo)}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Modifier
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleMoveToTomorrow(todo)}>
-                            <ArrowRight className="w-4 h-4 mr-2" />
-                            Reporter à demain
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => handleDelete(todo.id)}
-                            className="text-danger focus:text-danger"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Supprimer
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      {/* Dropdown Menu - prevent card click */}
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setEditingTodo(todo)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Modifier
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleMoveToTomorrow(todo)}>
+                              <ArrowRight className="w-4 h-4 mr-2" />
+                              Reporter à demain
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleDelete(todo.id)}
+                              className="text-danger focus:text-danger"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Supprimer
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
                   </div>
 

@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { CheckSquare, FolderKanban, Calendar } from 'lucide-react'
+import { CheckSquare, FolderKanban, Calendar, Clock } from 'lucide-react'
 import Link from 'next/link'
+import { getDaysOld, getAgeConfig } from '@/lib/utils/date-helpers'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -162,6 +163,17 @@ export default async function DashboardPage() {
                       {todo.status === 'done' && (
                         <Badge variant="success">Terminé</Badge>
                       )}
+                      {/* Task Age Indicator */}
+                      {(() => {
+                        const daysOld = getDaysOld(todo.created_at)
+                        const ageConfig = getAgeConfig(daysOld)
+                        return (
+                          <Badge variant={ageConfig.variant} className="gap-1">
+                            <Clock className="w-3 h-3" />
+                            {ageConfig.label}
+                          </Badge>
+                        )
+                      })()}
                     </div>
                   </div>
                 </CardContent>
